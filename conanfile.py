@@ -15,7 +15,8 @@ class Live555TestConan(ConanFile):
     generators = "cmake"
 
     requires = (
-        "live555/1.24.0@camposs/stable"
+        "live555/1.24.0@camposs/stable",
+        "libx264/20191217"
     )
 
     def __configure_cmake(self):
