@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.4)
 project(live555-test)
 
-add_definitions("-std=c++11")
+add_definitions("-std=c++17")
 
 set(CONAN_DISABLE_CHECK_COMPILER 1)
 
@@ -12,6 +12,8 @@ add_executable(server src/server.cpp
 src/Encoder.cpp
 src/LiveStreamSource.cpp
 src/H264VideoLiveServerMediaSubsession.cpp)
+
+set(CMAKE_BUILD_TYPE Debug)
 
 set(LIVE555_INCLUDE_DIR "${CONAN_INCLUDE_DIRS_LIVE555}/live555")
 include_directories(${LIVE555_INCLUDE_DIR}/UsageEnvironment)

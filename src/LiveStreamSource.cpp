@@ -3,132 +3,91 @@
 #include <fstream>
 #include <cstdio>
 #include <iostream>
+#include <thread>
 
-EventTriggerId LiveStreamSource::eventTriggerId = 0;
-
-LiveStreamSource *LiveStreamSource::createNew(UsageEnvironment &env) {
+LiveStreamSource *LiveStreamSource::createNew(UsageEnvironment &env, std::mutex& data_mutex,
+    bool* has_data, size_t* data_size, uint8_t** data_buffer,
+    std::set<FramedSource*>& sources) {
   LiveStreamSource *newSource =
-      new LiveStreamSource(env);
+      new LiveStreamSource(env, data_mutex, has_data, data_size, data_buffer, sources);
   return newSource;
 }
 
-LiveStreamSource::LiveStreamSource(UsageEnvironment &env)
-    : FramedSource(env) {
-  encoder = new Encoder(env);
+LiveStreamSource::LiveStreamSource(UsageEnvironment &env, std::mutex& data_mutex,
+    bool* has_data, size_t* data_size, uint8_t** data_buffer, std::set<FramedSource*>& sources)
+    : FramedSource(env),
+    data_mutex(data_mutex),
+    has_data(has_data),
+    data_size(data_size),
+    data_buffer(data_buffer),
+    sources(sources) {
 }
 
 LiveStreamSource::~LiveStreamSource() {
-  cleanup(CS_CAPTURE_STOP);
-  envir().taskScheduler().deleteEventTrigger(eventTriggerId);
-  eventTriggerId = 0;
 }
-
-void LiveStreamSource::cleanup(clean_state_t cleanState) {
-	switch(cleanState) {
-	case CS_CAPTURE_STOP:
-		encoder->stop_capturing();
-	case CS_MUNMAP_FILE:
-		encoder->uninit_device();
-	case CS_CLOSE_FILE:
-		encoder->close_device();
-	case CS_FREE_MEM:
-		encoder->uninitialize();
-	case CS_UNINITIALIZED:
-		break;
-	}
-}
-
 
 bool LiveStreamSource::init() {
-	if (!encoder->initialize()) {
-    cleanup(CS_FREE_MEM);
-    printf("Failed initializing encoder\n");
-		return false;
-	}
-
-	if(!encoder->open_device()) {
-    cleanup(CS_FREE_MEM);
-    printf("Failed opening device\n");
-		return false;
-	}
-
-	if (!encoder->init_device()) {
-    cleanup(CS_CLOSE_FILE);
-    printf("Failed initing device\n");
-		return false;
-	}
-
-	if (!encoder->init_mmap()) {
-    cleanup(CS_CLOSE_FILE);
-    printf("Failed initing mmap\n");
-		return false;
-	}
-
-	if(!encoder->start_capturing()) {
-    cleanup(CS_MUNMAP_FILE);
-    printf("Failed to start capturing\n");
-		return false;
-	}
-
-	encoder->mainloop();
-	if(eventTriggerId == 0) {
-		eventTriggerId = envir().taskScheduler().createEventTrigger(_deliverFrame);
-	}
 	return true;
 }
 
 void LiveStreamSource::doGetNextFrame() {
-  if (!nalQueue.empty()) {
-    deliverFrame();
-  }
-  else {
-    getFromEncoder();
-    gettimeofday(&fPresentationTime, NULL);
-    deliverFrame();
-  }
-}
-
-void LiveStreamSource::_deliverFrame(void* clientData) {
-  ((LiveStreamSource*)clientData)->deliverFrame();
+  // {
+  //   std::scoped_lock<std::mutex> lk(data_mutex);
+  //   if (!isCurrentlyAwaitingData()) {
+  //     printf("doGetNextFrame: not awaiting data \n");
+  //     return;
+  //   }
+  //   else if (!*has_data) {
+  //     printf("doGetNextFrame: no frame \n");
+  //     return;
+  //   }
+  // }
+  // printf("doGetNextFrame: delivering \n");
+  deliverFrame();
 }
 
 void LiveStreamSource::deliverFrame() {
+  printf("doGetNextFrame: deliverFrame \n");
   if (!isCurrentlyAwaitingData()) {
+    printf("deliverFrame: not awaiting data \n");
     return;
   }
-
-  auto nalu = nalQueue.front();
-  nalQueue.pop();
-
-  // cut off start codes 0 0 1 or 0 0 0 1
-  int truncate = 0;
-  if (nalu->i_payload >= 4 && nalu->p_payload[0] == 0 &&
-      nalu->p_payload[1] == 0 && nalu->p_payload[2] == 0 &&
-      nalu->p_payload[3] == 1) {
-    truncate = 4;
-  } else {
-    if (nalu->i_payload >= 3 && nalu->p_payload[0] == 0 &&
-        nalu->p_payload[1] == 0 && nalu->p_payload[2] == 1) {
-      truncate = 3;
+  {
+    printf("livesource locking mutex\n");
+    std::scoped_lock<std::mutex> lk(data_mutex);
+    if (!*has_data || !*data_buffer) {
+      printf("livesource no data\n");
+      return;
     }
-  }
 
-  if (nalu->i_payload - truncate > (signed int)fMaxSize) {
-    fFrameSize = fMaxSize;
-    fNumTruncatedBytes = nalu->i_payload - truncate - fMaxSize;
-  } else {
-    fFrameSize = nalu->i_payload - truncate;
+    // cut off start codes 0 0 1 or 0 0 0 1
+    size_t truncate = 0;
+    uint8_t *buffer = *data_buffer;
+    if (*data_size >= 4 && buffer[0] == 0 &&
+        buffer[1] == 0 && buffer[2] == 0 &&
+        buffer[3] == 1) {
+      truncate = 4;
+    }
+    else if (*data_size >= 3 && buffer[0] == 0 &&
+          buffer[1] == 0 && buffer[2] == 1) {
+        truncate = 3;
+    }
+
+    if (*data_size - truncate > fMaxSize) {
+      fFrameSize = fMaxSize;
+      fNumTruncatedBytes = *data_size - truncate - fMaxSize;
+    }
+    else {
+      fFrameSize = *data_size - truncate;
+    }
+    memmove(fTo, buffer + truncate, fFrameSize);
+    *has_data = false;
+    printf("Delivered frame\n");
+    printf("livesource unlocking mutex\n");
   }
-  memmove(fTo, nalu->p_payload + truncate, fFrameSize);
+  // nextTask() = envir().taskScheduler().scheduleDelayedTask(0,
+  //                                                          (TaskFunc *)FramedSource::afterGetting, this);
   FramedSource::afterGetting(this);
 }
 
 void LiveStreamSource::doStopGettingFrames() { fHaveStartedReading = false; }
-
-void LiveStreamSource::getFromEncoder() {
-	encoder->mainloop();
-	while(encoder->isNalsAvailableInOutputQueue()) {
-		auto nalu = encoder->getNalUnit();
-		nalQueue.push(nalu);
-	}
-}

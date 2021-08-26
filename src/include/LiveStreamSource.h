@@ -2,6 +2,7 @@
 #define _LIVE_STREAM_SOURCE_H
 
 #include <queue>
+#include <mutex>
 #include "Encoder.h"
 #include "H264VideoLiveServerMediaSubsession.h"
 
@@ -22,47 +23,42 @@
 #include "live555/liveMedia/FramedSource.hh"
 #endif
 
-#include<vector>
-
-typedef enum {
-CS_UNINITIALIZED,
-CS_FREE_MEM,
-CS_CLOSE_FILE,
-CS_MUNMAP_FILE,
-CS_CAPTURE_STOP
-} clean_state_t;
+#include<set>
 
 class LiveStreamSource: public FramedSource
 {
 public:
-    static LiveStreamSource* createNew(UsageEnvironment& env);
+    static LiveStreamSource* createNew(UsageEnvironment& env, std::mutex& data_mutex,
+    bool* has_data, size_t* data_size, uint8_t** data_buffer,
+    std::set<FramedSource*>& sources);
     // "preferredFrameSize" == 0 means 'no preference'
     // "playTimePerFrame" is in microseconds
     bool init();
-    static EventTriggerId eventTriggerId;
+    void deliverFrame();
+    virtual void doGetNextFrame();
 
 protected:
-    LiveStreamSource(UsageEnvironment& env);
+    LiveStreamSource(UsageEnvironment& env, std::mutex& data_mutex,
+    bool* has_data, size_t* data_size, uint8_t** data_buffer,
+    std::set<FramedSource*>& sources);
     // called only by createNew()
 
     virtual ~LiveStreamSource();
 
 private:
     // redefined virtual functions:
-    virtual void doGetNextFrame();
     virtual void doStopGettingFrames();
 
-    void cleanup(clean_state_t);
-    void getFromEncoder();
-    static void _deliverFrame(void*);
-    void deliverFrame();
 
 private:
     Boolean fHaveStartedReading;
     Boolean fNeedIFrame;
 
-    std::queue<x264_nal_t*> nalQueue;
-    Encoder* encoder;
+    std::mutex& data_mutex;
+    bool* has_data;
+    size_t* data_size;
+    uint8_t** data_buffer;
+    std::set<FramedSource*>& sources;
 };
 
 #endif

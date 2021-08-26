@@ -14,7 +14,7 @@ struct buffer {
   size_t length;
 };
 
-const char *dev_name = "/dev/video0";
+const char *dev_name = "/dev/video1";
 struct buffer *buffers;
 long row = VIDEO_WIDTH * VIDEO_HEIGHT / 2;
 

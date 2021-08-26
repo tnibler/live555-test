@@ -8,14 +8,25 @@
 
 H264VideoLiveServerMediaSubsession *
 H264VideoLiveServerMediaSubsession::createNew(UsageEnvironment &env,
-                                              Boolean reuseFirstSource) {
-  return new H264VideoLiveServerMediaSubsession(env, reuseFirstSource);
+                                              Boolean reuseFirstSource, std::mutex& data_mutex,
+    bool* has_data, size_t* data_size, uint8_t** data_buffer,
+    std::set<FramedSource*>& sources) {
+  return new H264VideoLiveServerMediaSubsession(env, reuseFirstSource,
+  data_mutex, has_data, data_size, data_buffer, sources);
 }
 
-H264VideoLiveServerMediaSubsession::H264VideoLiveServerMediaSubsession(UsageEnvironment& env,
-                                                                       Boolean reuseFirstSource)
-        : OnDemandServerMediaSubsession(env, reuseFirstSource),
-          fAuxSDPLine(NULL), fDoneFlag(0), fDummyRTPSink(NULL) {
+H264VideoLiveServerMediaSubsession::H264VideoLiveServerMediaSubsession(UsageEnvironment &env,
+                                                                       Boolean reuseFirstSource, std::mutex& data_mutex,
+                                                                       bool *has_data, size_t *data_size, uint8_t **data_buffer,
+                                                                       std::set<FramedSource*>& sources)
+    : OnDemandServerMediaSubsession(env, reuseFirstSource),
+      fAuxSDPLine(NULL), fDoneFlag(0), fDummyRTPSink(NULL),
+      data_mutex(data_mutex),
+      has_data(has_data),
+      data_size(data_size),
+      data_buffer(data_buffer),
+      sources(sources)
+{
 }
 
 H264VideoLiveServerMediaSubsession::~H264VideoLiveServerMediaSubsession() {
@@ -42,7 +53,6 @@ static void checkForAuxSDPLine(void *clientData) {
 }
 
 void H264VideoLiveServerMediaSubsession::checkForAuxSDPLine1() {
-  printf("checkForAuxSDPLine1\n");
   nextTask() = NULL;
 
   char const *dasl;
@@ -67,7 +77,6 @@ void H264VideoLiveServerMediaSubsession::checkForAuxSDPLine1() {
 char const *
 H264VideoLiveServerMediaSubsession::getAuxSDPLine(RTPSink *rtpSink,
                                                   FramedSource *inputSource) {
-  printf("getAuxSDPLine\n");
   if (fAuxSDPLine != NULL)
     return fAuxSDPLine; // it's already been set up (for a previous client)
 
@@ -97,17 +106,24 @@ FramedSource *H264VideoLiveServerMediaSubsession::createNewStreamSource(
   estBitrate = 100000; // kbps, estimate
 
   // Create the video source:
-  LiveStreamSource *source = LiveStreamSource::createNew(envir());
+  LiveStreamSource *source = LiveStreamSource::createNew(envir(),
+                                                         data_mutex, has_data, data_size, data_buffer, sources);
   if (source == NULL)
     return NULL;
-  if (!source->init()) {
+  if (!source->init())
+  {
     printf("Failed to init encoder and stuff\n");
     return NULL;
   }
-  printf("created Stream Source\n");
 
   // Create a framer for the Video Elementary Stream:
-  return H264VideoStreamDiscreteFramer::createNew(envir(), source);
+  auto framer = H264VideoStreamDiscreteFramer::createNew(envir(), source);
+  {
+    std::scoped_lock<std::mutex> lk(data_mutex);
+    sources.insert(framer);
+    printf("inserted Stream Source\n");
+  }
+  return framer;
 }
 
 RTPSink *H264VideoLiveServerMediaSubsession ::createNewRTPSink(
