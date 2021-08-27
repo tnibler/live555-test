@@ -1,0 +1,34 @@
+set print thread-events off
+set pagination off
+
+break std::mutex::lock
+command
+silent
+printf "Lock: "
+thread
+cont
+end
+
+break std::mutex::unlock
+command
+silent
+printf "Unlock "
+thread
+cont
+end
+
+break LiveStreamSource::doGetNextFrame
+command
+silent
+printf "doGetNextFrame "
+thread
+cont
+end
+
+break LiveStreamSource::deliverFrame
+command
+silent
+printf "deliverFrame "
+thread
+cont
+end
