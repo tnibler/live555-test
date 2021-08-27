@@ -35,7 +35,6 @@ public:
     // "playTimePerFrame" is in microseconds
     bool init();
     void deliverFrame();
-    virtual void doGetNextFrame();
 
 protected:
     LiveStreamSource(UsageEnvironment& env, std::mutex& data_mutex,
@@ -47,6 +46,7 @@ protected:
 
 private:
     // redefined virtual functions:
+    virtual void doGetNextFrame();
     virtual void doStopGettingFrames();
 
 

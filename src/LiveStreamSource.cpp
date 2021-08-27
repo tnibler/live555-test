@@ -31,32 +31,20 @@ bool LiveStreamSource::init() {
 }
 
 void LiveStreamSource::doGetNextFrame() {
-  // {
-  //   std::scoped_lock<std::mutex> lk(data_mutex);
-  //   if (!isCurrentlyAwaitingData()) {
-  //     printf("doGetNextFrame: not awaiting data \n");
-  //     return;
-  //   }
-  //   else if (!*has_data) {
-  //     printf("doGetNextFrame: no frame \n");
-  //     return;
-  //   }
-  // }
-  // printf("doGetNextFrame: delivering \n");
+  printf("doGetNextFrame\n");
   deliverFrame();
 }
 
 void LiveStreamSource::deliverFrame() {
-  printf("doGetNextFrame: deliverFrame \n");
   if (!isCurrentlyAwaitingData()) {
     printf("deliverFrame: not awaiting data \n");
     return;
   }
+  printf("deliverFrame\n");
   {
-    printf("livesource locking mutex\n");
     std::scoped_lock<std::mutex> lk(data_mutex);
     if (!*has_data || !*data_buffer) {
-      printf("livesource no data\n");
+      printf("deliverFrame: no data\n");
       return;
     }
 
@@ -82,12 +70,12 @@ void LiveStreamSource::deliverFrame() {
     }
     memmove(fTo, buffer + truncate, fFrameSize);
     *has_data = false;
-    printf("Delivered frame\n");
-    printf("livesource unlocking mutex\n");
+    printf("deliverFrame: Wrote frame\n");
   }
   // nextTask() = envir().taskScheduler().scheduleDelayedTask(0,
   //                                                          (TaskFunc *)FramedSource::afterGetting, this);
   FramedSource::afterGetting(this);
+  printf("deliverFrame: return\n");
 }
 
 void LiveStreamSource::doStopGettingFrames() { fHaveStartedReading = false; }

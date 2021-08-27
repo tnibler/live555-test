@@ -26,8 +26,8 @@ static void announceStream(RTSPServer* rtspServer, ServerMediaSession* sms,
 }
 
 void getFramesFromAllSources(void* client_data) {
-    printf("getFramesFromAllSources\n");
     auto sources = (std::set<FramedSource*>*)client_data;
+    printf("getFramesFromAllSources: %d sources\n", sources->size());
     for (auto source : *sources) {
         if (source->isCurrentlyAwaitingData()) {
             ((LiveStreamSource*)source)->deliverFrame();
@@ -56,8 +56,8 @@ int main(int argc, char** argv) {
     size_t data_size = 0;
     bool has_data = false;
     std::thread encoder_thread([&]() {
-        printf("Encoder thread started\n");
-        std::cout << std::this_thread::get_id() << std::endl;
+        printf("Encoder thread: started\n");
+        // std::cout << std::this_thread::get_id() << std::endl;
         auto encoder = new Encoder(*env);
         {
             if (!encoder->initialize())
@@ -96,12 +96,12 @@ int main(int argc, char** argv) {
             // printf("started capture\n");
         }
 
-        printf("Starting encoder loop\n");
+        printf("Encoder thread: Starting encoder loop\n");
         while (1) {
             encoder->mainloop();
             if (encoder->isNalsAvailableInOutputQueue()) {
                 {
-                    printf("encoder locking mutex\n");
+                    printf("Encoder thread: Frame available\n");
                     std::scoped_lock<std::mutex> lk(buffer_mutex);
                     auto nalu = encoder->getNalUnit();
                     if (nalu->i_payload > buffer_size)
@@ -113,17 +113,14 @@ int main(int argc, char** argv) {
                     data_size = nalu->i_payload;
                     memmove(buffer, nalu->p_payload, data_size);
                     has_data = true;
-                    printf("encoder unlocking mutex\n");
                 }
-                printf("triggering event\n");
+                printf("Encoder thread: Triggering event to call getFramesFromAllSources\n");
                 env->taskScheduler().triggerEvent(get_frames_event, &sources);
                 // env->taskScheduler().scheduleDelayedTask(10, getFramesFromAllSources, &sources);
-                printf("triggered event\n");
                 // event_loop_watch = 1;
-                printf("Wrote frame\n");
             }
             else {
-                printf("No nal\n");
+                // printf("No nal\n");
             }
         }
         printf("Exit encoder loop\n");
@@ -131,16 +128,16 @@ int main(int argc, char** argv) {
 
     const char* streamName = "live555TestStream";
     auto serverMediaSession =
-     ServerMediaSession::createNew(*env, streamName, streamName, "");
+        ServerMediaSession::createNew(*env, streamName, streamName, "");
     serverMediaSession->addSubsession(
         H264VideoLiveServerMediaSubsession::createNew(*env, True, buffer_mutex,
         &has_data, &data_size, &buffer, sources));
     server->addServerMediaSession(serverMediaSession);
     announceStream(server, serverMediaSession, streamName, "stream asdasd");
     while (1) {
-        printf("Starting event loop\n");
+        printf("Main: Starting event loop\n");
         env->taskScheduler().doEventLoop(&event_loop_watch);
-        printf("Interrupted event loop. Sources: %d\n", sources.size());
+        printf("Main: Interrupted event loop. Sources: %d\n", sources.size());
         event_loop_watch = 0;
     }
     printf("Exited event loop, joining thread\n");
