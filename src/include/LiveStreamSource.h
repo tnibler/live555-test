@@ -18,19 +18,16 @@
 #include <live555/BasicUsageEnvironment/BasicUsageEnvironment.hh>
 #endif
 
-
 #ifndef _FRAMED_SOURCE_HH
 #include "live555/liveMedia/FramedSource.hh"
 #endif
 
-#include<set>
+#include <set>
 
-class LiveStreamSource: public FramedSource
+class LiveStreamSource : public FramedSource
 {
 public:
-    static LiveStreamSource* createNew(UsageEnvironment& env, std::mutex& data_mutex,
-    bool* has_data, size_t* data_size, uint8_t** data_buffer,
-    std::set<FramedSource*>& sources);
+    static LiveStreamSource *createNew(UsageEnvironment &env, std::mutex &data_mutex);
     // "preferredFrameSize" == 0 means 'no preference'
     // "playTimePerFrame" is in microseconds
     bool init();
@@ -38,9 +35,7 @@ public:
     virtual void doGetNextFrame();
 
 protected:
-    LiveStreamSource(UsageEnvironment& env, std::mutex& data_mutex,
-    bool* has_data, size_t* data_size, uint8_t** data_buffer,
-    std::set<FramedSource*>& sources);
+    LiveStreamSource(UsageEnvironment &env, std::mutex &data_mutex);
     // called only by createNew()
 
     virtual ~LiveStreamSource();
@@ -49,16 +44,11 @@ private:
     // redefined virtual functions:
     virtual void doStopGettingFrames();
 
-
 private:
     Boolean fHaveStartedReading;
     Boolean fNeedIFrame;
 
-    std::mutex& data_mutex;
-    bool* has_data;
-    size_t* data_size;
-    uint8_t** data_buffer;
-    std::set<FramedSource*>& sources;
+    std::mutex &data_mutex;
 };
 
 #endif

@@ -107,7 +107,7 @@ FramedSource *H264VideoLiveServerMediaSubsession::createNewStreamSource(
 
   // Create the video source:
   LiveStreamSource *source = LiveStreamSource::createNew(envir(),
-                                                         data_mutex, has_data, data_size, data_buffer, sources);
+                                                         data_mutex);
   if (source == NULL)
     return NULL;
   if (!source->init())
