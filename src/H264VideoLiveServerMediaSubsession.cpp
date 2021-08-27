@@ -10,22 +10,22 @@ H264VideoLiveServerMediaSubsession *
 H264VideoLiveServerMediaSubsession::createNew(UsageEnvironment &env,
                                               Boolean reuseFirstSource, std::mutex& data_mutex,
     bool* has_data, size_t* data_size, uint8_t** data_buffer,
-    std::set<FramedSource*>& sources) {
+    FramedSource*& source) {
   return new H264VideoLiveServerMediaSubsession(env, reuseFirstSource,
-  data_mutex, has_data, data_size, data_buffer, sources);
+  data_mutex, has_data, data_size, data_buffer, source);
 }
 
 H264VideoLiveServerMediaSubsession::H264VideoLiveServerMediaSubsession(UsageEnvironment &env,
                                                                        Boolean reuseFirstSource, std::mutex& data_mutex,
                                                                        bool *has_data, size_t *data_size, uint8_t **data_buffer,
-                                                                       std::set<FramedSource*>& sources)
+                                                                       FramedSource*& source)
     : OnDemandServerMediaSubsession(env, reuseFirstSource),
       fAuxSDPLine(NULL), fDoneFlag(0), fDummyRTPSink(NULL),
       data_mutex(data_mutex),
       has_data(has_data),
       data_size(data_size),
       data_buffer(data_buffer),
-      sources(sources)
+      source(source)
 {
 }
 
@@ -106,22 +106,21 @@ FramedSource *H264VideoLiveServerMediaSubsession::createNewStreamSource(
   estBitrate = 100000; // kbps, estimate
 
   // Create the video source:
-  LiveStreamSource *source = LiveStreamSource::createNew(envir(),
+  LiveStreamSource *liveSource = LiveStreamSource::createNew(envir(),
                                                          data_mutex);
-  if (source == NULL)
+  if (liveSource == NULL)
     return NULL;
-  if (!source->init())
+  if (!liveSource->init())
   {
     printf("Failed to init encoder and stuff\n");
     return NULL;
   }
 
   // Create a framer for the Video Elementary Stream:
-  auto framer = H264VideoStreamDiscreteFramer::createNew(envir(), source);
+  auto framer = H264VideoStreamDiscreteFramer::createNew(envir(), liveSource);
   {
     std::scoped_lock<std::mutex> lk(data_mutex);
-    sources.insert(framer);
-    printf("inserted Stream Source\n");
+    source = framer;
   }
   return framer;
 }

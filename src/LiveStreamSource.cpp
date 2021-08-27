@@ -20,6 +20,7 @@ LiveStreamSource::LiveStreamSource(UsageEnvironment &env, std::mutex &data_mutex
 
 LiveStreamSource::~LiveStreamSource()
 {
+  printf("LiveStreamSource destructor\n");
 }
 
 bool LiveStreamSource::init()

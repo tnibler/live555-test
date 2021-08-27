@@ -29,8 +29,10 @@ static void announceStream(RTSPServer *rtspServer, ServerMediaSession *sms,
 void getFramesFromAllSources(void *client_data)
 {
     printf("getFramesFromAllSources\n");
-    auto sources = (std::set<FramedSource *> *)client_data;
-    for (auto source : *sources)
+    // auto sources = (std::set<FramedSource *> *)client_data;
+    auto source = (FramedSource*) client_data;
+    // for (auto source : *sources)
+    if (source)
     {
         if (source->isCurrentlyAwaitingData())
         {
@@ -54,7 +56,7 @@ int main(int argc, char **argv)
     char event_loop_watch = 0;
 
     std::mutex buffer_mutex;
-    std::set<FramedSource *> sources;
+    FramedSource* source = nullptr;
     uint8_t *buffer = nullptr;
     size_t buffer_size = 0;
     size_t data_size = 0;
@@ -67,7 +69,7 @@ int main(int argc, char **argv)
             printf("Encoder thread started\n");
             while (1)
             {
-                env->taskScheduler().triggerEvent(get_frames_event, &sources);
+                env->taskScheduler().triggerEvent(get_frames_event, source);
             }
         });
 
@@ -76,14 +78,14 @@ int main(int argc, char **argv)
         ServerMediaSession::createNew(*env, streamName, streamName, "");
     serverMediaSession->addSubsession(
         H264VideoLiveServerMediaSubsession::createNew(*env, True, buffer_mutex,
-                                                      &has_data, &data_size, &buffer, sources));
+                                                      &has_data, &data_size, &buffer, source));
     server->addServerMediaSession(serverMediaSession);
     announceStream(server, serverMediaSession, streamName, "stream asdasd");
     while (1)
     {
         printf("Starting event loop\n");
         env->taskScheduler().doEventLoop(&event_loop_watch);
-        printf("Interrupted event loop. Sources: %d\n", sources.size());
+        printf("Interrupted event loop. \n");
         event_loop_watch = 0;
     }
 }

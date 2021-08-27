@@ -32,7 +32,7 @@ public:
     static H264VideoLiveServerMediaSubsession*
     createNew(UsageEnvironment& env, Boolean reuseFirstSource, std::mutex& data_mutex,
     bool* has_data, size_t* data_size, uint8_t** data_buffer,
-    std::set<FramedSource*>& sources);
+    FramedSource*& source);
 
     // Used to implement "getAuxSDPLine()":
     void checkForAuxSDPLine1();
@@ -42,7 +42,7 @@ protected:
     H264VideoLiveServerMediaSubsession(UsageEnvironment& env,
                                        Boolean reuseFirstSource, std::mutex& data_mutex,
     bool* has_data, size_t* data_size, uint8_t** data_buffer,
-    std::set<FramedSource*>& sources);
+    FramedSource*& source);
     // called only by createNew();
     virtual ~H264VideoLiveServerMediaSubsession();
 
@@ -67,7 +67,7 @@ private:
     bool* has_data;
     size_t* data_size;
     uint8_t** data_buffer;
-    std::set<FramedSource*>& sources;
+    FramedSource*& source;
 };
 
 #endif
