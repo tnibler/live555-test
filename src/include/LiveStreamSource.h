@@ -3,8 +3,8 @@
 
 #include <queue>
 #include <mutex>
+#include <set>
 #include "Encoder.h"
-#include "H264VideoLiveServerMediaSubsession.h"
 
 // the sources are not meant to be packages that way .. include order is essential as well as the
 // guarded includes to allow for adopting to the current file structure
@@ -23,23 +23,20 @@
 #include "live555/liveMedia/FramedSource.hh"
 #endif
 
-#include<set>
-
 class LiveStreamSource: public FramedSource
 {
 public:
     static LiveStreamSource* createNew(UsageEnvironment& env, std::mutex& data_mutex,
-    bool* has_data, size_t* data_size, uint8_t** data_buffer,
-    std::set<FramedSource*>& sources);
+    bool* has_data, size_t* data_size, uint8_t** data_buffer);
     // "preferredFrameSize" == 0 means 'no preference'
     // "playTimePerFrame" is in microseconds
     bool init();
-    void deliverFrame();
+    void onFrame();
+    static std::vector<LiveStreamSource*> instances;
 
 protected:
     LiveStreamSource(UsageEnvironment& env, std::mutex& data_mutex,
-    bool* has_data, size_t* data_size, uint8_t** data_buffer,
-    std::set<FramedSource*>& sources);
+    bool* has_data, size_t* data_size, uint8_t** data_buffer);
     // called only by createNew()
 
     virtual ~LiveStreamSource();
@@ -48,17 +45,19 @@ private:
     // redefined virtual functions:
     virtual void doGetNextFrame();
     virtual void doStopGettingFrames();
+    void deliverFrame();
+    static void doGetNextFrame0(void* clientData) { ((LiveStreamSource*)clientData)->doGetNextFrame(); };
 
 
 private:
     Boolean fHaveStartedReading;
     Boolean fNeedIFrame;
 
+    EventTriggerId event_trigger_id;
     std::mutex& data_mutex;
     bool* has_data;
     size_t* data_size;
-    uint8_t** data_buffer;
-    std::set<FramedSource*>& sources;
+    uint8_t** data_buffer = nullptr;
 };
 
 #endif

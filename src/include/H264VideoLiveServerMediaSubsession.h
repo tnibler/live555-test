@@ -23,6 +23,8 @@
 #include <live555/liveMedia/FileServerMediaSubsession.hh>
 #endif
 
+#include "LiveStreamSource.h"
+
 #include<mutex>
 #include<set>
 
@@ -31,8 +33,7 @@ class H264VideoLiveServerMediaSubsession: public OnDemandServerMediaSubsession
 public:
     static H264VideoLiveServerMediaSubsession*
     createNew(UsageEnvironment& env, Boolean reuseFirstSource, std::mutex& data_mutex,
-    bool* has_data, size_t* data_size, uint8_t** data_buffer,
-    std::set<FramedSource*>& sources);
+    bool* has_data, size_t* data_size, uint8_t** data_buffer);
 
     // Used to implement "getAuxSDPLine()":
     void checkForAuxSDPLine1();
@@ -41,8 +42,7 @@ public:
 protected:
     H264VideoLiveServerMediaSubsession(UsageEnvironment& env,
                                        Boolean reuseFirstSource, std::mutex& data_mutex,
-    bool* has_data, size_t* data_size, uint8_t** data_buffer,
-    std::set<FramedSource*>& sources);
+    bool* has_data, size_t* data_size, uint8_t** data_buffer);
     // called only by createNew();
     virtual ~H264VideoLiveServerMediaSubsession();
 
@@ -67,7 +67,6 @@ private:
     bool* has_data;
     size_t* data_size;
     uint8_t** data_buffer;
-    std::set<FramedSource*>& sources;
 };
 
 #endif
